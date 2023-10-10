@@ -10,10 +10,13 @@ interface IERC7390 {
     struct VanillaOptionData {
         Side side;
         address underlyingToken;
+        uint256 underlyingTokenId;
         uint256 amount;
         address strikeToken;
+        uint256 strikeTokenId;        
         uint256 strike;
         address premiumToken;
+        uint256 premiumTokenId;
         uint256 premium;
         uint256 exerciseWindowStart;
         uint256 exerciseWindowEnd;

@@ -31,33 +31,39 @@ async function deployInfraFixture() {
   await token2.connect(acct3).faucet(TOKEN2_START_BALANCE);
 
   const emptyBytes = ethers.AbiCoder.defaultAbiCoder().encode(["string"], [""]);
-  
+
   currentTime = await time.latest();
 
   const callOption = {
     side: 0,
     underlyingToken: token1.target,
+    underlyingTokenId: 0,
     amount: OPTION_COUNT,
     strikeToken: token2.target,
+    strikeTokenId: 0,
     strike: STRIKE,
     premiumToken: token2.target,
+    premiumTokenId: 0,
     premium: PREMIUM,
     exerciseWindowStart: currentTime,
     exerciseWindowEnd: currentTime + 60 * 60,
-    data: emptyBytes
+    data: emptyBytes,
   };
 
   const putOption = {
     side: 1,
     underlyingToken: token1.target,
+    underlyingTokenId: 0,
     amount: OPTION_COUNT,
     strikeToken: token2.target,
+    strikeTokenId: 0,
     strike: STRIKE,
     premiumToken: token2.target,
+    premiumTokenId: 0,
     premium: PREMIUM,
     exerciseWindowStart: currentTime,
     exerciseWindowEnd: currentTime + 60 * 60,
-    data: emptyBytes
+    data: emptyBytes,
   };
 
   return {
