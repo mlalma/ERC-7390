@@ -13,11 +13,20 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
+    enum Token {
+        ERC20,
+        ERC721,
+        ERC1155
+    }
+
     struct OptionIssuance {
         VanillaOptionData data;
         address seller;
         uint256 exercisedOptions;
         uint256 soldOptions;
+        Token underlyingTokenType;
+        Token strikeTokenType;
+        Token premiumTokenType;
     }
 
     mapping(uint256 => OptionIssuance) public issuance;
@@ -32,9 +41,13 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         OptionIssuance memory newIssuance;
         newIssuance.data = optionData;
         newIssuance.seller = _msgSender();
+        newIssuance.underlyingTokenType = _resolveToken(optionData.underlyingToken);
+        newIssuance.strikeTokenType = _resolveToken(optionData.strikeToken);
+        newIssuance.premiumTokenType = _resolveToken(optionData.premiumToken);
 
         if (optionData.side == Side.Call) {
             _transferFrom(
+                newIssuance.underlyingTokenType,
                 optionData.underlyingToken,
                 optionData.underlyingTokenId,
                 _msgSender(),
@@ -43,11 +56,12 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
             );
         } else {
             _transferFrom(
+                newIssuance.strikeTokenType,
                 optionData.strikeToken,
                 optionData.strikeTokenId,
                 _msgSender(),
                 address(this),
-                (optionData.strike * optionData.amount) / 10 ** _getTokenDecimals(optionData.underlyingToken)
+                (optionData.strike * optionData.amount) / 10 ** _getTokenDecimals(newIssuance.underlyingTokenType, optionData.underlyingToken)
             );
         }
 
@@ -97,8 +111,11 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
 
         address underlyingToken = selectedIssuance.data.underlyingToken;
         uint256 underlyingTokenId = selectedIssuance.data.underlyingTokenId;
+        Token underlyintTokenType = selectedIssuance.underlyingTokenType;
+
         address strikeToken = selectedIssuance.data.strikeToken;
         uint256 strikeTokenId = selectedIssuance.data.strikeTokenId;
+        Token strikeTokenType = selectedIssuance.strikeTokenType;
 
         uint256 remainder = (amount * selectedIssuance.data.strike) % selectedIssuance.data.amount;
         uint256 transferredStrikeTokens = (amount * selectedIssuance.data.strike) / selectedIssuance.data.amount;
@@ -116,16 +133,16 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         require(transferredStrikeTokens > 0, "transferredStrikeTokens");
         if (selectedIssuance.data.side == Side.Call) {
             // Buyer pays seller for the underlying token(s) at strike price
-            _transferFrom(strikeToken, strikeTokenId, _msgSender(), selectedIssuance.seller, transferredStrikeTokens);
+            _transferFrom(strikeTokenType, strikeToken, strikeTokenId, _msgSender(), selectedIssuance.seller, transferredStrikeTokens);
 
             // Transfer underlying token(s) to buyer
-            _transfer(underlyingToken, underlyingTokenId, _msgSender(), amount);
+            _transfer(underlyintTokenType, underlyingToken, underlyingTokenId, _msgSender(), amount);
         } else {
             // Buyer transfers the underlying token(s) to writer
-            _transferFrom(underlyingToken, underlyingTokenId, _msgSender(), selectedIssuance.seller, amount);
+            _transferFrom(underlyintTokenType, underlyingToken, underlyingTokenId, _msgSender(), selectedIssuance.seller, amount);
 
             // Pay buyer the strike price
-            _transfer(strikeToken, strikeTokenId, _msgSender(), transferredStrikeTokens);
+            _transfer(strikeTokenType, strikeToken, strikeTokenId, _msgSender(), transferredStrikeTokens);
         }
 
         // Burn used option tokens
@@ -144,6 +161,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         if (selectedIssuance.data.amount > selectedIssuance.exercisedOptions) {
             uint256 underlyingTokenGiveback = selectedIssuance.data.amount - selectedIssuance.exercisedOptions;
             _transfer(
+                selectedIssuance.underlyingTokenType,
                 selectedIssuance.data.underlyingToken,
                 selectedIssuance.data.underlyingTokenId,
                 _msgSender(),
@@ -162,6 +180,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         require(selectedIssuance.soldOptions == 0, "soldOptions");
 
         _transfer(
+            selectedIssuance.underlyingTokenType,
             selectedIssuance.data.underlyingToken,
             selectedIssuance.data.underlyingTokenId,
             _msgSender(),
@@ -182,40 +201,50 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         emit PremiumUpdated(id, amount);
     }
 
-    function _transfer(address tokenAddress, uint256 tokenId, address to, uint256 amount) internal {
-        if (IERC165(tokenAddress).supportsInterface(type(IERC721).interfaceId)) {
-            require(amount == 1, "NFTs are single tokens");
-            IERC721(tokenAddress).transferFrom(address(this), to, tokenId);
-        } else if (IERC165(tokenAddress).supportsInterface(type(IERC1155).interfaceId)) {
-            IERC1155(tokenAddress).safeTransferFrom(address(this), to, tokenId, amount, bytes(""));
+    function _resolveToken(address tokenAddress) internal view returns (Token) {
+        (bool callIsSuccess, bytes memory response) = tokenAddress.staticcall(abi.encodeWithSignature("supportsInterface(bytes4)", type(IERC721).interfaceId));
+        bool isERC721 = callIsSuccess ? abi.decode(response, (bool)) : false;
+        
+        if (!callIsSuccess) {
+            return Token.ERC20;
+        } else if (isERC721) {
+            return Token.ERC721;
+        }
+
+        // We know that the supportsInterface() exists on tokenAddress so call it directly
+        if (IERC1155(tokenAddress).supportsInterface(type(IERC1155).interfaceId)) {
+            return Token.ERC1155;
         } else {
+            revert("Unknown token");
+        }
+    }
+
+    function _transfer(Token tokenType, address tokenAddress, uint256 tokenId, address to, uint256 amount) internal {
+        if (tokenType == Token.ERC20) {
             bool success = IERC20(tokenAddress).transfer(to, amount);
             if (!success) revert("Transfer failed");
+        } else if (tokenType == Token.ERC721) {
+            require(amount == 1, "NFTs are single tokens");
+            IERC721(tokenAddress).transferFrom(address(this), to, tokenId);
+        } else {
+            IERC1155(tokenAddress).safeTransferFrom(address(this), to, tokenId, amount, bytes(""));
         }
     }
 
-    function _transferFrom(address tokenAddress, uint256 tokenId, address from, address to, uint256 amount) internal {
-        if (IERC165(tokenAddress).supportsInterface(type(IERC721).interfaceId)) {
-            require(amount == 1, "NFTs are single tokens");
-            IERC721(tokenAddress).transferFrom(from, to, tokenId);
-        } else if (IERC165(tokenAddress).supportsInterface(type(IERC1155).interfaceId)) {
-            IERC1155(tokenAddress).safeTransferFrom(from, to, tokenId, amount, bytes(""));
-        } else {
+    function _transferFrom(Token tokenType, address tokenAddress, uint256 tokenId, address from, address to, uint256 amount) internal {
+        if (tokenType == Token.ERC20) {
             bool success = IERC20(tokenAddress).transferFrom(from, to, amount);
             if (!success) revert("Transfer failed");
+        } else if (tokenType == Token.ERC721) {
+            require(amount == 1, "NFTs are single tokens");
+            IERC721(tokenAddress).transferFrom(from, to, tokenId);
+        } else {
+            IERC1155(tokenAddress).safeTransferFrom(from, to, tokenId, amount, bytes(""));
         }
     }
 
-    function _getTokenDecimals(address tokenAddress) internal view returns (uint8) {
-        if (IERC165(tokenAddress).supportsInterface(type(IERC721).interfaceId)) {
-            return 0;
-        } else if (IERC165(tokenAddress).supportsInterface(type(IERC1155).interfaceId)) {
-            // We have to assume zero decimals since we can't access the metadata for URI
-            // Limits the usefulness of the protocol, but should be used only for "fungible NFTs" >.<
-            return 0;
-        } else {
-            return IERC20(tokenAddress).decimals();
-        }
+    function _getTokenDecimals(Token tokenType, address tokenAddress) internal view returns (uint8) {
+        return tokenType == Token.ERC20 ? IERC20(tokenAddress).decimals() : 0;        
     }
 
     /*function _isFungible(address tokenAddress) internal view returns (bool) {
