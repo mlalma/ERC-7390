@@ -78,6 +78,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         require(block.timestamp <= selectedIssuance.data.exerciseWindowEnd, "exceriseWindowEnd");
         require(selectedIssuance.data.amount - selectedIssuance.soldOptions >= amount, "amount");
 
+        // TODO: Check this logic for non-fungibles
         if (selectedIssuance.data.premium > 0) {
             uint256 remainder = (amount * selectedIssuance.data.premium) % selectedIssuance.data.amount;
             uint256 premiumPaid = (amount * selectedIssuance.data.premium) / selectedIssuance.data.amount;
@@ -120,6 +121,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         uint256 remainder = (amount * selectedIssuance.data.strike) % selectedIssuance.data.amount;
         uint256 transferredStrikeTokens = (amount * selectedIssuance.data.strike) / selectedIssuance.data.amount;
 
+        // TODO: Check this logic for non-fungibles
         if (remainder > 0) {
             if (selectedIssuance.data.side == Side.Call) {
                 transferredStrikeTokens += 1;
@@ -206,6 +208,8 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         bool isERC721 = callIsSuccess ? abi.decode(response, (bool)) : false;
         
         if (!callIsSuccess) {
+            // This is heuristics - if the contract does not support supportsInterface() call,
+            // assume that it is ERC20
             return Token.ERC20;
         } else if (isERC721) {
             return Token.ERC721;
@@ -244,6 +248,8 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
     }
 
     function _getTokenDecimals(Token tokenType, address tokenAddress) internal view returns (uint8) {
+        // Note: ERC-1155 token might have decimals, but they cannot be fetched directly
+        // from contract so we assume that ERC-1155 tokens are "multiple"-NFTs
         return tokenType == Token.ERC20 ? IERC20(tokenAddress).decimals() : 0;        
     }
 
