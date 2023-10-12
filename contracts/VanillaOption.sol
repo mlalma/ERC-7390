@@ -21,9 +21,9 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
 
     struct OptionIssuance {
         VanillaOptionData data;
-        address seller;
         uint256 exercisedOptions;
         uint256 soldOptions;
+        address seller;
         Token underlyingTokenType;
         Token strikeTokenType;
         Token premiumTokenType;
