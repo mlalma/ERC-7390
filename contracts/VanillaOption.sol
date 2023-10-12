@@ -111,7 +111,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
 
         address underlyingToken = selectedIssuance.data.underlyingToken;
         uint256 underlyingTokenId = selectedIssuance.data.underlyingTokenId;
-        Token underlyintTokenType = selectedIssuance.underlyingTokenType;
+        Token underlyingTokenType = selectedIssuance.underlyingTokenType;
 
         address strikeToken = selectedIssuance.data.strikeToken;
         uint256 strikeTokenId = selectedIssuance.data.strikeTokenId;
@@ -136,10 +136,10 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
             _transferFrom(strikeTokenType, strikeToken, strikeTokenId, _msgSender(), selectedIssuance.seller, transferredStrikeTokens);
 
             // Transfer underlying token(s) to buyer
-            _transfer(underlyintTokenType, underlyingToken, underlyingTokenId, _msgSender(), amount);
+            _transfer(underlyingTokenType, underlyingToken, underlyingTokenId, _msgSender(), amount);
         } else {
             // Buyer transfers the underlying token(s) to writer
-            _transferFrom(underlyintTokenType, underlyingToken, underlyingTokenId, _msgSender(), selectedIssuance.seller, amount);
+            _transferFrom(underlyingTokenType, underlyingToken, underlyingTokenId, _msgSender(), selectedIssuance.seller, amount);
 
             // Pay buyer the strike price
             _transfer(strikeTokenType, strikeToken, strikeTokenId, _msgSender(), transferredStrikeTokens);
