@@ -16,11 +16,20 @@ async function deployInfraFixture() {
   const vanillaOption = await ethers.deployContract("VanillaOption");
   await vanillaOption.waitForDeployment();
 
-  const token1 = await ethers.deployContract("MockToken1");
+  const token1 = await ethers.deployContract("MockToken1ERC20");
   await token1.waitForDeployment();
 
-  const token2 = await ethers.deployContract("MockToken2");
+  const token2 = await ethers.deployContract("MockToken2ERC20");
   await token2.waitForDeployment();
+
+  const token3 = await ethers.deployContract("MockToken3ERC721");
+  await token3.waitForDeployment();
+
+  const token4 = await ethers.deployContract("MockToken4ERC1155");
+  await token4.waitForDeployment();
+
+  const token5 = await ethers.deployContract("MockToken5None");
+  await token5.waitForDeployment();
 
   await token1.connect(acct1).faucet(TOKEN1_START_BALANCE);
   await token1.connect(acct2).faucet(TOKEN1_START_BALANCE);
@@ -30,7 +39,9 @@ async function deployInfraFixture() {
   await token2.connect(acct2).faucet(TOKEN2_START_BALANCE);
   await token2.connect(acct3).faucet(TOKEN2_START_BALANCE);
 
-  const emptyBytes = ethers.AbiCoder.defaultAbiCoder().encode(["string"], [""]);
+  await token3.connect(acct1).faucet(100);
+
+  /* const emptyBytes = ethers.AbiCoder.defaultAbiCoder().encode(["string"], [""]);*/
 
   currentTime = await time.latest();
 
@@ -47,7 +58,6 @@ async function deployInfraFixture() {
     premium: PREMIUM,
     exerciseWindowStart: currentTime,
     exerciseWindowEnd: currentTime + 60 * 60,
-    data: emptyBytes,
   };
 
   const putOption = {
@@ -63,7 +73,6 @@ async function deployInfraFixture() {
     premium: PREMIUM,
     exerciseWindowStart: currentTime,
     exerciseWindowEnd: currentTime + 60 * 60,
-    data: emptyBytes,
   };
 
   return {
@@ -72,6 +81,9 @@ async function deployInfraFixture() {
     optionContract: vanillaOption,
     token1: token1,
     token2: token2,
+    token3: token3,
+    token4: token4,
+    token5: token5,
     acct1: acct1,
     acct2: acct2,
     acct3: acct3,

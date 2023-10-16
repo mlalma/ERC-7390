@@ -61,7 +61,8 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
                 optionData.strikeTokenId,
                 _msgSender(),
                 address(this),
-                (optionData.strike * optionData.amount) / 10 ** _getTokenDecimals(newIssuance.underlyingTokenType, optionData.underlyingToken)
+                (optionData.strike * optionData.amount) /
+                    10 ** _getTokenDecimals(newIssuance.underlyingTokenType, optionData.underlyingToken)
             );
         }
 
@@ -75,7 +76,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         OptionIssuance memory selectedIssuance = issuance[id];
 
         require(amount > 0, "buyerOptionCount");
-        require(block.timestamp <= selectedIssuance.data.exerciseWindowEnd, "exceriseWindowEnd");
+        require(block.timestamp <= selectedIssuance.data.exerciseWindowEnd, "exerciseWindowEnd");
         require(selectedIssuance.data.amount - selectedIssuance.soldOptions >= amount, "amount");
 
         // TODO: Check this logic for non-fungibles
@@ -135,13 +136,27 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         require(transferredStrikeTokens > 0, "transferredStrikeTokens");
         if (selectedIssuance.data.side == Side.Call) {
             // Buyer pays seller for the underlying token(s) at strike price
-            _transferFrom(strikeTokenType, strikeToken, strikeTokenId, _msgSender(), selectedIssuance.seller, transferredStrikeTokens);
+            _transferFrom(
+                strikeTokenType,
+                strikeToken,
+                strikeTokenId,
+                _msgSender(),
+                selectedIssuance.seller,
+                transferredStrikeTokens
+            );
 
             // Transfer underlying token(s) to buyer
             _transfer(underlyingTokenType, underlyingToken, underlyingTokenId, _msgSender(), amount);
         } else {
             // Buyer transfers the underlying token(s) to writer
-            _transferFrom(underlyingTokenType, underlyingToken, underlyingTokenId, _msgSender(), selectedIssuance.seller, amount);
+            _transferFrom(
+                underlyingTokenType,
+                underlyingToken,
+                underlyingTokenId,
+                _msgSender(),
+                selectedIssuance.seller,
+                amount
+            );
 
             // Pay buyer the strike price
             _transfer(strikeTokenType, strikeToken, strikeTokenId, _msgSender(), transferredStrikeTokens);
@@ -204,12 +219,14 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
     }
 
     function _resolveToken(address tokenAddress) internal view returns (Token) {
-        (bool callIsSuccess, bytes memory response) = tokenAddress.staticcall(abi.encodeWithSignature("supportsInterface(bytes4)", type(IERC721).interfaceId));
+        (bool callIsSuccess, bytes memory response) = tokenAddress.staticcall(
+            abi.encodeWithSignature("supportsInterface(bytes4)", type(IERC721).interfaceId)
+        );
+
         bool isERC721 = callIsSuccess ? abi.decode(response, (bool)) : false;
-        
+
         if (!callIsSuccess) {
-            // This is heuristics - if the contract does not support supportsInterface() call,
-            // assume that it is ERC20
+            // Heuristics - if the contract does not support supportsInterface() call, assume it is ERC20
             return Token.ERC20;
         } else if (isERC721) {
             return Token.ERC721;
@@ -221,6 +238,12 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         } else {
             revert("Unknown token");
         }
+    }
+
+    function _getTokenDecimals(Token tokenType, address tokenAddress) internal view returns (uint8) {
+        // Note: ERC-1155 token might have decimals, but they cannot be fetched directly
+        // from contract so we assume that ERC-1155 tokens are "multiple"-NFTs
+        return tokenType == Token.ERC20 ? IERC20(tokenAddress).decimals() : 0;
     }
 
     function _transfer(Token tokenType, address tokenAddress, uint256 tokenId, address to, uint256 amount) internal {
@@ -235,7 +258,14 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         }
     }
 
-    function _transferFrom(Token tokenType, address tokenAddress, uint256 tokenId, address from, address to, uint256 amount) internal {
+    function _transferFrom(
+        Token tokenType,
+        address tokenAddress,
+        uint256 tokenId,
+        address from,
+        address to,
+        uint256 amount
+    ) internal {
         if (tokenType == Token.ERC20) {
             bool success = IERC20(tokenAddress).transferFrom(from, to, amount);
             if (!success) revert("Transfer failed");
@@ -247,15 +277,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         }
     }
 
-    function _getTokenDecimals(Token tokenType, address tokenAddress) internal view returns (uint8) {
-        // Note: ERC-1155 token might have decimals, but they cannot be fetched directly
-        // from contract so we assume that ERC-1155 tokens are "multiple"-NFTs
-        return tokenType == Token.ERC20 ? IERC20(tokenAddress).decimals() : 0;        
-    }
-
-    /*function _isFungible(address tokenAddress) internal view returns (bool) {
-        return IERC165(tokenAddress).supportsInterface(type(IERC20).interfaceId);
-    }*/
+    /* ERC1155 methods */
 
     function _mint(address to, uint256 id, uint256 amount, bytes memory data) internal override {
         super._mint(to, id, amount, data);
@@ -265,9 +287,13 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         super._burn(from, id, amount);
     }
 
+    /* IERC165 methods */
+
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, IERC165) returns (bool) {
         return interfaceId == type(IERC7390).interfaceId || super.supportsInterface(interfaceId);
     }
+
+    /* IERC1155Receiver methods */
 
     function onERC1155Received(
         address /*operator*/,
