@@ -146,4 +146,25 @@ describe("Buying", function () {
 
     expect(await optionContract.balanceOf(acct2.address, 0)).to.equal(17 + OPTION_COUNT / 2);
   });
+
+  it("Should buy all call options when underlying is ERC721", async function () {
+    const { callOption, optionContract, token1, token2, acct1, acct2 } = await loadFixture(deployInfraFixture);
+    await token1.connect(acct1).approve(optionContract.target, OPTION_COUNT);
+    await expect(optionContract.connect(acct1).create(callOption)).to.emit(optionContract, "Created");
+
+    const boughtOptions = OPTION_COUNT / 10;
+    const premiumPaid = (boughtOptions * PREMIUM) / OPTION_COUNT;
+    await token2.connect(acct2).approve(optionContract.target, premiumPaid);
+    await expect(optionContract.connect(acct2).buy(0, OPTION_COUNT / 10)).to.emit(optionContract, "Bought");
+
+    expect(await token1.balanceOf(optionContract.target)).to.equal(OPTION_COUNT);
+    expect(await token1.balanceOf(acct1.address)).to.equal(TOKEN1_START_BALANCE - OPTION_COUNT);
+    expect(await token1.balanceOf(acct2.address)).to.equal(TOKEN1_START_BALANCE);
+
+    expect(await token2.balanceOf(optionContract.target)).to.equal(0);
+    expect(await token2.balanceOf(acct1.address)).to.equal(TOKEN2_START_BALANCE + premiumPaid);
+    expect(await token2.balanceOf(acct2.address)).to.equal(TOKEN2_START_BALANCE - premiumPaid);
+
+    expect(await optionContract.balanceOf(acct2.address, 0)).to.equal(boughtOptions);
+  });
 });

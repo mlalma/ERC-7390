@@ -93,7 +93,7 @@ describe("Creation", function () {
     await expect(optionContract.connect(acct1).create(callOption)).to.be.revertedWith("ERC20: insufficient allowance");
   });
 
-  it("Should correctly create an option with ERC-721 as an underlying", async function () {
+  it("Should correctly create a call option with ERC-721 as an underlying", async function () {
     const { callOption, optionContract, acct1, token3 } = await loadFixture(deployInfraFixture);
 
     await token3.connect(acct1).approve(optionContract.target, 100);
@@ -112,5 +112,98 @@ describe("Creation", function () {
     expect(option.underlyingTokenType).to.equal(1);
     expect(option.strikeTokenType).to.equal(0);
     expect(option.premiumTokenType).to.equal(0);
+  });
+
+  it("Should correctly create a call option with ERC-1155 as an underlying", async function () {
+    const { callOption, optionContract, acct1, token3, token4 } = await loadFixture(deployInfraFixture);
+
+    await token3.connect(acct1).approve(optionContract.target, 100);
+
+    const optionData = {
+      ...callOption,
+      underlyingToken: await token4.getAddress(),
+      underlyingTokenId: 200,
+      amount: 100,
+    };
+
+    // Don't like this :(, but it is the only thing we have on the ERC-1155 standard
+    await token4.connect(acct1).setApprovalForAll(optionContract.target, true);
+    await expect(optionContract.connect(acct1).create(optionData)).to.emit(optionContract, "Created");
+    await token4.connect(acct1).setApprovalForAll(optionContract.target, false);
+
+    expect(await optionContract.issuanceCounter()).to.equal(1);
+
+    const option = await optionContract.issuance(0);
+    expect(option.underlyingTokenType).to.equal(2);
+    expect(option.strikeTokenType).to.equal(0);
+    expect(option.premiumTokenType).to.equal(0);
+  });
+
+  it("Should correctly create a put option with ERC-721 as an underlying and ERC-1155 as strike", async function () {
+    const { putOption, optionContract, acct1, token3, token4 } = await loadFixture(deployInfraFixture);
+
+    await token3.connect(acct1).approve(optionContract.target, 100);
+
+    const optionData = {
+      ...putOption,
+      underlyingToken: token3.target,
+      underlyingTokenId: 100,
+      amount: 1,
+      strikeToken: token4.target,
+      strikeTokenId: 200,
+      strike: 1234,
+    };
+
+    await token4.connect(acct1).setApprovalForAll(optionContract.target, true);
+    await expect(optionContract.connect(acct1).create(optionData)).to.emit(optionContract, "Created");
+    await token4.connect(acct1).setApprovalForAll(optionContract.target, false);
+
+    expect(await optionContract.issuanceCounter()).to.equal(1);
+
+    const option = await optionContract.issuance(0);
+    expect(option.underlyingTokenType).to.equal(1);
+    expect(option.strikeTokenType).to.equal(2);
+    expect(option.premiumTokenType).to.equal(0);
+  });
+
+  it("Should correctly create a put option with ERC-1155 as an underlying and ERC-721 as strike", async function () {
+    const { putOption, optionContract, acct1, token3, token4 } = await loadFixture(deployInfraFixture);
+
+    await token3.connect(acct1).approve(optionContract.target, 100);
+
+    const optionData = {
+      ...putOption,
+      underlyingToken: token4.target,
+      underlyingTokenId: 200,
+      amount: 1234,
+      strikeToken: token3.target,
+      strikeTokenId: 100,
+      strike: 1,
+    };
+
+    await token4.connect(acct1).setApprovalForAll(optionContract.target, true);
+    await expect(optionContract.connect(acct1).create(optionData)).to.emit(optionContract, "Created");
+    await token4.connect(acct1).setApprovalForAll(optionContract.target, false);
+
+    expect(await optionContract.issuanceCounter()).to.equal(1);
+
+    const option = await optionContract.issuance(0);
+    expect(option.underlyingTokenType).to.equal(2);
+    expect(option.strikeTokenType).to.equal(1);
+    expect(option.premiumTokenType).to.equal(0);
+  });
+
+  it("Should fail to create an option with unknown token type as an underlying", async function () {
+    const { callOption, optionContract, acct1, token5 } = await loadFixture(deployInfraFixture);
+
+    const optionData = {
+      ...callOption,
+      underlyingToken: token5.target,
+      underlyingTokenId: 0,
+      amount: 1,
+    };
+
+    await expect(optionContract.connect(acct1).create(optionData)).to.be.rejectedWith("Unknown token");
+    expect(await optionContract.issuanceCounter()).to.equal(0);
   });
 });

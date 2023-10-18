@@ -41,6 +41,8 @@ async function deployInfraFixture() {
 
   await token3.connect(acct1).faucet(100);
 
+  await token4.connect(acct1).faucet(200, STRIKE);
+
   /* const emptyBytes = ethers.AbiCoder.defaultAbiCoder().encode(["string"], [""]);*/
 
   currentTime = await time.latest();

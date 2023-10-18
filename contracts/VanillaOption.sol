@@ -61,8 +61,10 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
                 optionData.strikeTokenId,
                 _msgSender(),
                 address(this),
-                (optionData.strike * optionData.amount) /
-                    10 ** _getTokenDecimals(newIssuance.underlyingTokenType, optionData.underlyingToken)
+                newIssuance.strikeTokenType == Token.ERC721
+                    ? optionData.strike
+                    : (optionData.strike * optionData.amount) /
+                        10 ** _getTokenDecimals(newIssuance.underlyingTokenType, optionData.underlyingToken)
             );
         }
 
@@ -79,7 +81,8 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         require(block.timestamp <= selectedIssuance.data.exerciseWindowEnd, "exerciseWindowEnd");
         require(selectedIssuance.data.amount - selectedIssuance.soldOptions >= amount, "amount");
 
-        // TODO: Check this logic for non-fungibles
+        // TODO: If premium token is ERC721 -> Should hand over all options
+        // TODO: Check that works on all combinations
         if (selectedIssuance.data.premium > 0) {
             uint256 remainder = (amount * selectedIssuance.data.premium) % selectedIssuance.data.amount;
             uint256 premiumPaid = (amount * selectedIssuance.data.premium) / selectedIssuance.data.amount;
