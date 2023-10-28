@@ -129,10 +129,13 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         uint256 strikeTokenId = selectedIssuance.data.strikeTokenId;
         Token strikeTokenType = selectedIssuance.strikeTokenType;
 
-        uint256 remainder = (amount * selectedIssuance.data.strike) % selectedIssuance.data.amount;
-        uint256 transferredStrikeTokens = (amount * selectedIssuance.data.strike) / selectedIssuance.data.amount;
+        uint256 remainder = strikeTokenType == Token.ERC721
+            ? 0
+            : (amount * selectedIssuance.data.strike) % selectedIssuance.data.amount;
+        uint256 transferredStrikeTokens = strikeTokenType == Token.ERC721
+            ? selectedIssuance.data.strike
+            : (amount * selectedIssuance.data.strike) / selectedIssuance.data.amount;
 
-        // TODO: Check this logic for non-fungibles
         if (remainder > 0) {
             if (selectedIssuance.data.side == Side.Call) {
                 transferredStrikeTokens += 1;
@@ -142,6 +145,8 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
                 }
             }
         }
+
+        // TODO: Test this logic carefully
 
         require(transferredStrikeTokens > 0, "transferredStrikeTokens");
         if (selectedIssuance.data.side == Side.Call) {
@@ -153,6 +158,12 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
                 _msgSender(),
                 selectedIssuance.seller,
                 transferredStrikeTokens
+            );
+
+            // If strike token is ERC721 then we need to move all underlying tokens to buyer
+            require(
+                selectedIssuance.strikeTokenType != Token.ERC721 || selectedIssuance.data.amount == amount,
+                "amount"
             );
 
             // Transfer underlying token(s) to buyer
