@@ -81,21 +81,28 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         require(block.timestamp <= selectedIssuance.data.exerciseWindowEnd, "exerciseWindowEnd");
         require(selectedIssuance.data.amount - selectedIssuance.soldOptions >= amount, "amount");
 
-        // TODO: If premium token is ERC721 -> Should hand over all options
-        // TODO: Check that works on all combinations
+        // If premium token type is ERC721, there is only one of them and thus the buyer
+        // should buy all available options when handing out the NFT to issuer
+        require(selectedIssuance.premiumTokenType != Token.ERC721 || selectedIssuance.data.amount == amount, "amount");
+
         if (selectedIssuance.data.premium > 0) {
             uint256 remainder = (amount * selectedIssuance.data.premium) % selectedIssuance.data.amount;
             uint256 premiumPaid = (amount * selectedIssuance.data.premium) / selectedIssuance.data.amount;
+
+            // Need to be careful with ERC1155 and adding extra premium token due to remainder
+            // For ERC20 it doesn't really matter since there are usually 6..12+ decimals
             if (remainder > 0) {
                 premiumPaid += 1;
             }
 
-            bool success = IERC20(selectedIssuance.data.premiumToken).transferFrom(
+            _transferFrom(
+                selectedIssuance.premiumTokenType,
+                selectedIssuance.data.premiumToken,
+                selectedIssuance.data.premiumTokenId,
                 _msgSender(),
                 selectedIssuance.seller,
                 premiumPaid
             );
-            if (!success) revert("Transfer Failed");
         }
 
         issuance[id].soldOptions += amount;
@@ -229,13 +236,13 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         bool isERC721 = callIsSuccess ? abi.decode(response, (bool)) : false;
 
         if (!callIsSuccess) {
-            // Heuristics - if the contract does not support supportsInterface() call, assume it is ERC20
+            // If the contract does not support supportsInterface() call, assume it is ERC20
             return Token.ERC20;
         } else if (isERC721) {
             return Token.ERC721;
         }
 
-        // We know that the supportsInterface() exists on tokenAddress so call it directly
+        // supportsInterface() exists on tokenAddress so call it directly
         if (IERC1155(tokenAddress).supportsInterface(type(IERC1155).interfaceId)) {
             return Token.ERC1155;
         } else {
@@ -244,8 +251,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
     }
 
     function _getTokenDecimals(Token tokenType, address tokenAddress) internal view returns (uint8) {
-        // Note: ERC-1155 token might have decimals, but they cannot be fetched directly
-        // from contract so we assume that ERC-1155 tokens are "multiple"-NFTs
+        // Note: We assume that ERC-1155 tokens are "fungible"-NFTs
         return tokenType == Token.ERC20 ? IERC20(tokenAddress).decimals() : 0;
     }
 
