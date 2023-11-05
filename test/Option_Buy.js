@@ -59,7 +59,7 @@ describe("Buying", function () {
     const boughtOptions = OPTION_COUNT / 10;
     const premiumPaid = (boughtOptions * PREMIUM) / OPTION_COUNT;
     await token2.connect(acct2).approve(optionContract.target, premiumPaid);
-    await expect(optionContract.connect(acct2).buy(0, OPTION_COUNT / 10)).to.be.revertedWith("exceriseWindowEnd");
+    await expect(optionContract.connect(acct2).buy(0, OPTION_COUNT / 10)).to.be.revertedWith("exerciseWindowEnd");
   });
 
   it("Should fail to buy options that are expired", async function () {
@@ -73,7 +73,7 @@ describe("Buying", function () {
 
     await time.increase(2 * 60 * 60);
 
-    await expect(optionContract.connect(acct2).buy(0, OPTION_COUNT / 10)).to.be.rejectedWith("exceriseWindowEnd");
+    await expect(optionContract.connect(acct2).buy(0, OPTION_COUNT / 10)).to.be.rejectedWith("exerciseWindowEnd");
   });
 
   it("Should fail to buy options because there are no options to be bought", async function () {
@@ -147,24 +147,71 @@ describe("Buying", function () {
     expect(await optionContract.balanceOf(acct2.address, 0)).to.equal(17 + OPTION_COUNT / 2);
   });
 
-  it("Should buy all call options when underlying is ERC721", async function () {
-    const { callOption, optionContract, token1, token2, acct1, acct2 } = await loadFixture(deployInfraFixture);
-    await token1.connect(acct1).approve(optionContract.target, OPTION_COUNT);
-    await expect(optionContract.connect(acct1).create(callOption)).to.emit(optionContract, "Created");
+  it("Should buy a single call option when underlying is ERC721", async function () {
+    const { callOption, optionContract, token1, token2, token3, acct1, acct2 } = await loadFixture(deployInfraFixture);
+    await token3.connect(acct1).approve(optionContract.target, 100);
+    const optionData = {
+      ...callOption,
+      underlyingToken: token3.target,
+      underlyingTokenId: 100,
+      amount: 1,
+    };
+    await expect(optionContract.connect(acct1).create(optionData)).to.emit(optionContract, "Created");
 
-    const boughtOptions = OPTION_COUNT / 10;
-    const premiumPaid = (boughtOptions * PREMIUM) / OPTION_COUNT;
+    const boughtOptions = 1;
+    const premiumPaid = boughtOptions * PREMIUM;
     await token2.connect(acct2).approve(optionContract.target, premiumPaid);
-    await expect(optionContract.connect(acct2).buy(0, OPTION_COUNT / 10)).to.emit(optionContract, "Bought");
+    await expect(optionContract.connect(acct2).buy(0, 1)).to.emit(optionContract, "Bought");
 
-    expect(await token1.balanceOf(optionContract.target)).to.equal(OPTION_COUNT);
-    expect(await token1.balanceOf(acct1.address)).to.equal(TOKEN1_START_BALANCE - OPTION_COUNT);
-    expect(await token1.balanceOf(acct2.address)).to.equal(TOKEN1_START_BALANCE);
+    expect(await token3.ownerOf(100)).to.equal(optionContract.target);
 
     expect(await token2.balanceOf(optionContract.target)).to.equal(0);
     expect(await token2.balanceOf(acct1.address)).to.equal(TOKEN2_START_BALANCE + premiumPaid);
     expect(await token2.balanceOf(acct2.address)).to.equal(TOKEN2_START_BALANCE - premiumPaid);
 
     expect(await optionContract.balanceOf(acct2.address, 0)).to.equal(boughtOptions);
+  });
+
+  it("Should not buy a call option when underlying is ERC721 due to not paying enough premium", async function () {
+    const { callOption, optionContract, token1, token2, token3, acct1, acct2 } = await loadFixture(deployInfraFixture);
+    await token3.connect(acct1).approve(optionContract.target, 100);
+    const optionData = {
+      ...callOption,
+      underlyingToken: token3.target,
+      underlyingTokenId: 100,
+      amount: 1,
+    };
+    await expect(optionContract.connect(acct1).create(optionData)).to.emit(optionContract, "Created");
+
+    const boughtOptions = 1;
+    const premiumPaid = boughtOptions * PREMIUM - 1;
+    await token2.connect(acct2).approve(optionContract.target, premiumPaid);
+    await expect(optionContract.connect(acct2).buy(0, 1)).to.be.rejectedWith("ERC20: insufficient allowance");
+  });
+
+  it("Should buy a all call options when premium is single ERC721", async function () {
+    /*// TODO: CODE THIS
+    const { callOption, optionContract, token1, token2, token3, acct1, acct2 } = await loadFixture(deployInfraFixture);
+    await token3.connect(acct1).approve(optionContract.target, 100);
+    const optionData = {
+      ...callOption,
+      underlyingToken: token3.target,
+      underlyingTokenId: 100,
+      amount: 1,
+    };
+    await expect(optionContract.connect(acct1).create(optionData)).to.emit(optionContract, "Created");
+
+    const boughtOptions = 1;
+    const premiumPaid = boughtOptions * PREMIUM;
+    await token2.connect(acct2).approve(optionContract.target, premiumPaid);
+    await expect(optionContract.connect(acct2).buy(0, 1)).to.emit(optionContract, "Bought");
+
+    expect(await token3.ownerOf(100)).to.equal(optionContract.target);
+
+    expect(await token2.balanceOf(optionContract.target)).to.equal(0);
+    expect(await token2.balanceOf(acct1.address)).to.equal(TOKEN2_START_BALANCE + premiumPaid);
+    expect(await token2.balanceOf(acct2.address)).to.equal(TOKEN2_START_BALANCE - premiumPaid);
+
+    expect(await optionContract.balanceOf(acct2.address, 0)).to.equal(boughtOptions);*/
   });
 });

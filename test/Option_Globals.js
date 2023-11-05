@@ -41,7 +41,7 @@ async function deployInfraFixture() {
 
   await token3.connect(acct1).faucet(100);
 
-  await token4.connect(acct1).faucet(200, STRIKE);
+  await token4.connect(acct1).faucet(200, OPTION_COUNT);
 
   /* const emptyBytes = ethers.AbiCoder.defaultAbiCoder().encode(["string"], [""]);*/
 

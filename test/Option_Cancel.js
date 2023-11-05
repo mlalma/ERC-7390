@@ -11,7 +11,7 @@ const {
 } = require("./Option_Globals");
 
 describe("Canceling", function () {
-  it("Should cancel the option contract and return the underlying to seller", async function () {
+  it("Should cancel the option contract and return ERC-20 underlying to seller", async function () {
     const { callOption, optionContract, token1, acct1, currentTime } = await loadFixture(deployInfraFixture);
 
     await token1.connect(acct1).approve(optionContract.target, OPTION_COUNT);
@@ -25,6 +25,56 @@ describe("Canceling", function () {
 
     expect(await token1.balanceOf(optionContract.target)).to.equal(0);
     expect(await token1.balanceOf(acct1.address)).to.equal(TOKEN1_START_BALANCE);
+
+    // Make sure data is deleted
+    const option = await optionContract.issuance(0);
+    expect(option.seller).to.equal(ZERO_ADDRESS);
+  });
+
+  it("Should cancel the option contract and return ERC-721 underlying to seller", async function () {
+    const { callOption, optionContract, acct1, token3, token4 } = await loadFixture(deployInfraFixture);
+
+    await token3.connect(acct1).approve(optionContract.target, 100);
+
+    const optionData = {
+      ...callOption,
+      underlyingToken: token3.target,
+      underlyingTokenId: 100,
+      amount: 1,
+    };
+
+    await expect(optionContract.connect(acct1).create(optionData)).to.emit(optionContract, "Created");
+
+    expect(await token3.ownerOf(100)).to.equal(optionContract.target);
+
+    await expect(optionContract.connect(acct1).cancel(0)).to.emit(optionContract, "Canceled");
+
+    expect(await token3.ownerOf(100)).to.equal(acct1.address);
+
+    // Make sure data is deleted
+    const option = await optionContract.issuance(0);
+    expect(option.seller).to.equal(ZERO_ADDRESS);
+  });
+
+  it("Should cancel the option contract and return ERC-1155 underlying to seller", async function () {
+    const { callOption, optionContract, acct1, token3, token4 } = await loadFixture(deployInfraFixture);
+
+    const optionData = {
+      ...callOption,
+      underlyingToken: token4.target,
+      underlyingTokenId: 200,
+      amount: 100,
+    };
+
+    await token4.connect(acct1).setApprovalForAll(optionContract.target, true);
+    await expect(optionContract.connect(acct1).create(optionData)).to.emit(optionContract, "Created");
+    await token4.connect(acct1).setApprovalForAll(optionContract.target, false);
+
+    expect(await token4.balanceOf(optionContract.target, 200)).to.equal(100);
+
+    await expect(optionContract.connect(acct1).cancel(0)).to.emit(optionContract, "Canceled");
+
+    expect(await token3.ownerOf(100)).to.equal(acct1.address);
 
     // Make sure data is deleted
     const option = await optionContract.issuance(0);
