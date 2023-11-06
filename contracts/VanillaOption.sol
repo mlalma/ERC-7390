@@ -217,13 +217,30 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         require(_msgSender() == selectedIssuance.seller, "seller");
         require(selectedIssuance.soldOptions == 0, "soldOptions");
 
-        _transfer(
-            selectedIssuance.underlyingTokenType,
-            selectedIssuance.data.underlyingToken,
-            selectedIssuance.data.underlyingTokenId,
-            _msgSender(),
-            selectedIssuance.data.amount
-        );
+        if (selectedIssuance.data.side == Side.Call) {
+            _transfer(
+                selectedIssuance.underlyingTokenType,
+                selectedIssuance.data.underlyingToken,
+                selectedIssuance.data.underlyingTokenId,
+                _msgSender(),
+                selectedIssuance.data.amount
+            );
+        } else {
+            _transfer(
+                selectedIssuance.strikeTokenType,
+                selectedIssuance.data.strikeToken,
+                selectedIssuance.data.strikeTokenId,
+                _msgSender(),
+                selectedIssuance.strikeTokenType == Token.ERC721
+                    ? selectedIssuance.data.strike
+                    : (selectedIssuance.data.strike * selectedIssuance.data.amount) /
+                        10 **
+                            _getTokenDecimals(
+                                selectedIssuance.underlyingTokenType,
+                                selectedIssuance.data.underlyingToken
+                            )
+            );
+        }
 
         delete issuance[id];
         emit Canceled(id);

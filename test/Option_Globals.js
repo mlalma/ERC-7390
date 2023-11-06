@@ -2,6 +2,18 @@ const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers"
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+const TokensToIndex = {
+  ERC20: 0,
+  ERC721: 1,
+  ERC1155: 2,
+};
+
+const IndexToTokens = {
+  0: "ERC20",
+  1: "ERC721",
+  2: "ERC1155",
+};
+
 const TOKEN1_DECIMALS = 10 ** 6;
 const TOKEN1_START_BALANCE = 10 * TOKEN1_DECIMALS;
 const TOKEN2_START_BALANCE = 10 * 10 ** 6;
@@ -106,4 +118,6 @@ module.exports = {
   STRIKE,
   PREMIUM,
   ZERO_ADDRESS,
+  TokensToIndex,
+  IndexToTokens,
 };
