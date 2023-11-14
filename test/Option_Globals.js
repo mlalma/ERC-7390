@@ -54,10 +54,13 @@ async function deployInfraFixture() {
   await token3.connect(acct1).faucet(100);
   await token3.connect(acct1).faucet(101);
   await token3.connect(acct1).faucet(102);
+  await token3.connect(acct2).faucet(103);
 
   await token4.connect(acct1).faucet(200, OPTION_COUNT);
   await token4.connect(acct1).faucet(201, TOKEN1_START_BALANCE);
   await token4.connect(acct1).faucet(202, PREMIUM);
+
+  await token4.connect(acct2).faucet(202, PREMIUM);
 
   /* const emptyBytes = ethers.AbiCoder.defaultAbiCoder().encode(["string"], [""]);*/
 

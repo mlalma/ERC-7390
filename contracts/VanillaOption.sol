@@ -46,6 +46,8 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
         newIssuance.premiumTokenType = _resolveToken(optionData.premiumToken);
 
         if (optionData.side == Side.Call) {
+            require(optionData.amount > 0, "Zero underlying tokens");
+
             _transferFrom(
                 newIssuance.underlyingTokenType,
                 optionData.underlyingToken,
@@ -55,16 +57,19 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
                 optionData.amount
             );
         } else {
+            uint256 tokenAmount = newIssuance.strikeTokenType == Token.ERC721
+                ? optionData.strike
+                : (optionData.strike * optionData.amount) /
+                    10 ** _getTokenDecimals(newIssuance.underlyingTokenType, optionData.underlyingToken);
+            require(tokenAmount > 0, "Zero strike tokens");
+
             _transferFrom(
                 newIssuance.strikeTokenType,
                 optionData.strikeToken,
                 optionData.strikeTokenId,
                 _msgSender(),
                 address(this),
-                newIssuance.strikeTokenType == Token.ERC721
-                    ? optionData.strike
-                    : (optionData.strike * optionData.amount) /
-                        10 ** _getTokenDecimals(newIssuance.underlyingTokenType, optionData.underlyingToken)
+                tokenAmount
             );
         }
 
@@ -145,8 +150,6 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
                 }
             }
         }
-
-        // TODO: Test this logic carefully
 
         require(transferredStrikeTokens > 0, "transferredStrikeTokens");
         if (selectedIssuance.data.side == Side.Call) {
@@ -251,6 +254,7 @@ contract VanillaOption is IERC7390, ERC1155, ReentrancyGuard, IERC1155Receiver {
 
         require(_msgSender() == selectedIssuance.seller, "seller");
         require(block.timestamp <= selectedIssuance.data.exerciseWindowEnd, "exerciseWindowEnd");
+        require(selectedIssuance.premiumTokenType != Token.ERC721 || amount <= 1, "0 or 1 for ERC-721");
 
         issuance[id].data.premium = amount;
         emit PremiumUpdated(id, amount);

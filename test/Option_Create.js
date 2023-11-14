@@ -7,6 +7,8 @@ const {
   OPTION_COUNT,
   STRIKE,
   PREMIUM,
+  TokensToIndex,
+  IndexToTokens,
 } = require("./Option_Globals");
 
 describe("Creation", function () {
@@ -230,18 +232,6 @@ describe("Creation", function () {
   });
 
   it(`Should correctly create put options with all different combinations`, async function () {
-    const TokensToIndex = {
-      ERC20: 0,
-      ERC721: 1,
-      ERC1155: 2,
-    };
-
-    const IndexToTokens = {
-      0: "ERC20",
-      1: "ERC721",
-      2: "ERC1155",
-    };
-
     for (underlyingIndex = 0; underlyingIndex < 3; underlyingIndex++) {
       for (strikeIndex = 0; strikeIndex < 3; strikeIndex++) {
         for (premiumIndex = 0; premiumIndex < 3; premiumIndex++) {
